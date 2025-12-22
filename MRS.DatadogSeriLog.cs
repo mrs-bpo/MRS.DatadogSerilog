@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 /// Simple C# class for Datadog Direct API logging with Serilog
 /// Compatible with .NET Standard 2.0
 /// </summary>
-public class DatadogDirectLogger
+public class DataDogSeriLogger
 {
     private static bool _isInitialized = false;
     private static ILogger _logger;

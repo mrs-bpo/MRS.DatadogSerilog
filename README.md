@@ -1,15 +1,15 @@
-# DataDogLogger
+# DataDogSeriLogger
 
 # get apikey from MRS data dog website
 
 // With file logging
-DatadogDirectLogger.Initialize(apiKey, "MyService", "production", "logs/app.log");
+DataDogSeriLogger.Initialize(apiKey, "MyService", "production", "logs/app.log");
 
 // Without file logging (console + Datadog only)
-DatadogDirectLogger.Initialize(apiKey, "MyService", "production");
+DataDogSeriLogger.Initialize(apiKey, "MyService", "production");
 
 // Basic logging with console only
-DatadogDirectLogger.InitializeBasic();
+DataDogSeriLogger.InitializeBasic();
 
 
 
