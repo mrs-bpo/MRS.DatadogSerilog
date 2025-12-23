@@ -1,5 +1,12 @@
 # DataDogSeriLogger
 
+This is going to assume you have at least these versions of these in your project
+
+<PackageReference Include="Serilog" Version="2.12.0" />
+<PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
+<PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
 # get apikey from MRS data dog website
 
 // With file logging

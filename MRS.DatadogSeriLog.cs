@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -239,6 +240,9 @@ public class DatadogDirectSink : ILogEventSink, IDisposable
     private readonly string _environment;
     private readonly HttpClient _httpClient;
     private readonly string _datadogUrl = "https://http-intake.logs.datadoghq.com/v1/input/{0}";
+    private readonly System.Collections.Concurrent.ConcurrentBag<Task> _pendingTasks;
+    private readonly object _disposeLock = new object();
+    private bool _isDisposed = false;
 
     public DatadogDirectSink(string apiKey, string serviceName, string environment)
     {
@@ -246,14 +250,22 @@ public class DatadogDirectSink : ILogEventSink, IDisposable
         _serviceName = serviceName;
         _environment = environment;
         _httpClient = new HttpClient();
+        _httpClient.Timeout = TimeSpan.FromSeconds(10);
         _httpClient.DefaultRequestHeaders.Add("DD-API-KEY", apiKey);
+        _pendingTasks = new System.Collections.Concurrent.ConcurrentBag<Task>();
     }
 
     public void Emit(LogEvent logEvent)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         try
         {
-            Task.Run(() => SendToDatadog(logEvent));
+            var task = Task.Run(() => SendToDatadog(logEvent));
+            _pendingTasks.Add(task);
         }
         catch (Exception ex)
         {
@@ -261,10 +273,15 @@ public class DatadogDirectSink : ILogEventSink, IDisposable
         }
     }
 
-    private void SendToDatadog(LogEvent logEvent)
+    private async Task SendToDatadog(LogEvent logEvent)
     {
         try
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             var logEntry = new
             {
                 timestamp = logEvent.Timestamp.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
@@ -280,12 +297,21 @@ public class DatadogDirectSink : ILogEventSink, IDisposable
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = string.Format(_datadogUrl, _apiKey);
 
-            var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
+            var response = await _httpClient.PostAsync(url, content).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Failed to send log to Datadog: {response.StatusCode}");
+                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                Console.WriteLine($"Failed to send log to Datadog: {response.StatusCode} - {responseBody}");
             }
+        }
+        catch (TaskCanceledException)
+        {
+            Console.WriteLine("Timeout sending log to Datadog");
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Network error sending log to Datadog: {ex.Message}");
         }
         catch (Exception ex)
         {
@@ -315,6 +341,45 @@ public class DatadogDirectSink : ILogEventSink, IDisposable
 
     public void Dispose()
     {
-        _httpClient?.Dispose();
+        lock (_disposeLock)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+
+            try
+            {
+                // Wait for all pending tasks to complete with a timeout
+                var allTasks = _pendingTasks.Where(t => t != null && !t.IsCompleted).ToArray();
+                
+                if (allTasks.Length > 0)
+                {
+                    Console.WriteLine($"Waiting for {allTasks.Length} pending log(s) to be sent to Datadog...");
+                    
+                    // Wait up to 30 seconds for all tasks to complete
+                    var completed = Task.WaitAll(allTasks, TimeSpan.FromSeconds(30));
+                    
+                    if (!completed)
+                    {
+                        Console.WriteLine($"Warning: Some logs may not have been sent to Datadog (timeout)");
+                    }
+                    else
+                    {
+                        Console.WriteLine("All pending logs sent to Datadog successfully");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error while flushing logs to Datadog: {ex.Message}");
+            }
+            finally
+            {
+                _httpClient?.Dispose();
+            }
+        }
     }
 }
