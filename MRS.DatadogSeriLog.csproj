@@ -2,7 +2,25 @@
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net6.0;net8.0</TargetFrameworks>
+    
+    <!-- Package Metadata -->
+    <PackageId>MRS.DatadogSeriLog</PackageId>
+    <Title>MRS DataDog Serilog Logger</Title>
+    <Description>Simple Serilog sink for DataDog Direct API. Supports .NET Framework 4.6.1+, .NET 6, and .NET 8. Includes proper async handling for console applications.</Description>
+    <Authors>MRS BPO</Authors>
+    <Company>MRS BPO</Company>
+    <PackageTags>serilog;datadog;logging;sink;netstandard;net6;net8</PackageTags>
+    <RepositoryUrl>https://github.com/mrs-bpo/MRS.DatadogSerilog</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/mrs-bpo/MRS.DatadogSerilog</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright © MRS BPO 2025</Copyright>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="2.12.0" />
