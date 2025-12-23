@@ -54,25 +54,55 @@ if [ "$IS_PRERELEASE" != "true" ]; then
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
   
+  # Handle tag collision by incrementing until we find an unused version
+  TAG_NAME="v$NEW_VERSION"
+  FINAL_VERSION="$NEW_VERSION"
+  
+  while git rev-parse "$TAG_NAME" >/dev/null 2>&1; do
+    echo "Tag $TAG_NAME already exists, incrementing patch version..."
+    
+    # Parse version and increment patch
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$FINAL_VERSION"
+    PATCH=${PATCH%%-*}  # Remove any prerelease suffix
+    PATCH=$((PATCH + 1))
+    FINAL_VERSION="$MAJOR.$MINOR.$PATCH"
+    TAG_NAME="v$FINAL_VERSION"
+    
+    echo "Trying version: $FINAL_VERSION"
+  done
+  
+  # If version changed due to collision, update the project file again
+  if [ "$FINAL_VERSION" != "$NEW_VERSION" ]; then
+    echo "Version collision detected, using $FINAL_VERSION instead of $NEW_VERSION"
+    
+    # Update version in csproj with final version
+    if grep -q "<Version>" "$CSPROJ_FILE"; then
+      sed -i "s|<Version>.*</Version>|<Version>$FINAL_VERSION</Version>|g" "$CSPROJ_FILE"
+    fi
+    if grep -q "<PackageVersion>" "$CSPROJ_FILE"; then
+      sed -i "s|<PackageVersion>.*</PackageVersion>|<PackageVersion>$FINAL_VERSION</PackageVersion>|g" "$CSPROJ_FILE"
+    fi
+    
+    NEW_VERSION="$FINAL_VERSION"
+  fi
+  
   # Commit the version change
   git add "$CSPROJ_FILE"
   git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
   
   # Create and push tag
-  TAG_NAME="v$NEW_VERSION"
+  git tag -a "$TAG_NAME" -m "Release version $NEW_VERSION"
+  echo "Created tag: $TAG_NAME"
   
-  if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-    echo "Tag $TAG_NAME already exists"
-  else
-    git tag -a "$TAG_NAME" -m "Release version $NEW_VERSION"
-    echo "Created tag: $TAG_NAME"
-    
-    # Push tag (the workflow will push the commit)
-    git push origin "$TAG_NAME" || echo "Failed to push tag (may need to configure permissions)"
-  fi
+  # Push both commit and tag
+  git push origin HEAD:master || echo "Failed to push commit"
+  git push origin "$TAG_NAME" || echo "Failed to push tag"
+  
+  # Output the final version for the pack step
+  echo "FINAL_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 else
   echo "Skipping git tag creation for prerelease version"
 fi
 
-echo "Version update complete"
+echo "Version update complete: $NEW_VERSION"
 

@@ -126,9 +126,9 @@ jobs:
       - name: Pack NuGet package
         run: |
           mkdir -p build/packages
+          # Version is already set in .csproj by update-version-and-publish.sh
           dotnet pack ./MRS.DatadogSeriLog.sln \
             -c Release \
-            -p:PackageVersion='${{ needs.detect-version.outputs.version }}' \
             -p:IncludeSymbols=true \
             -p:SymbolPackageFormat=snupkg \
             -o build/packages
